@@ -13,8 +13,8 @@ class pQuery
 
     public function attr ($attribute = false)
     {
-        if(preg_match("#^<[^>]+" . $attribute . "=['\"](.*?)['\"][^>]*>#i", $this->currentHtml, $match)) {
-            return $match[1];
+        if(preg_match("#^<[^>]+" . $attribute . "=(['\"])(.*?)\\1[^>]*>#si", $this->currentHtml, $match)) {
+            return $match[2];
         }
 
         return false;
@@ -27,7 +27,7 @@ class pQuery
 
     public function html ()
     {
-        if(preg_match("#^<[^>]+>(.*)</[^>]+>$#i", $this->currentHtml, $match)) {
+        if(preg_match("#^<[^>]+>(.*)</[^>]+>$#si", $this->currentHtml, $match)) {
             return $match[1];
         }
 
@@ -37,12 +37,15 @@ class pQuery
     public function find ($selector, $currentHtml = false)
     {
         if(!$currentHtml) {
+
+            $this->setUnic();
+
             $currentHtml = $this->currentHtml;
         }
 
         $selector = trim($selector);
 
-        if(preg_match("#^([a-z0-9]+)(?:\[([a-z0-9\-]+)(?:(\^|!|\$|\*)?=(.+?))?\])?(?::([a-z]+)(?:\((.*?)\))?)?(?:\s(.+?))?$#i", $selector, $match)) {
+        if(preg_match("#^([a-z0-9]+)(?:\[([a-z0-9\-]+)(?:(\^|!|\$|\*)?=(.+?))?\])?(?::([a-z]+)(?:\((.*?)\))?)?(?:\s(.+?))?$#si", $selector, $match)) {
 
             $tagName = $match[1];
             $attribute = false;
@@ -77,7 +80,7 @@ class pQuery
                 $subSelector = $match[7];
             }
 
-            $regex = '<' . $tagName;
+            $regex = '<' . $tagName . '(\\\\[0-9]+)';
 
             if($attribute) {
 
@@ -105,13 +108,15 @@ class pQuery
                     $value = '.*?';
                 }
 
-                $regex .= '\s*=\s*[\'"]' . $value . '[\'"]';
+                $regex .= '\s*=\s*([\'"])' . $value . '\2';
+            } else {
+                $regex .= '()';
             }
 
             $regex .= '(?:|\s+[^>]+|\s*/)>';
-            $regex .= '.*?</' . $tagName . '>';
+            $regex .= '(.*?)</' . $tagName . '\1>';
 
-            if (preg_match_all("#" . $regex . "#i", $currentHtml, $matches)) {
+            if (preg_match_all("#" . $regex . "#si", $currentHtml, $matches)) {
 
                 foreach($matches[0] as $i => $item) {
 
@@ -140,7 +145,7 @@ class pQuery
 
                     if($continue) {
                         if($subSelector) {
-                            if($this->find($subSelector, $item)) {
+                            if($this->find($subSelector, $matches[3][$i])) {
                                 break;
                             }
                         } else {
@@ -155,5 +160,32 @@ class pQuery
         }
 
         return false;
+    }
+
+    private function setUnic()
+    {
+        $counter = array();
+
+        $this->currentHtml = preg_replace_callback("#((<)([a-z]+)(\s[^>]*|)(/?>)|(</)([a-z]+)(>))#si", function ($match) use(&$counter) {
+
+                if(isset($match[7])) {
+
+                    $counter[$match[7]]--;
+
+                    $tagName = $match[6] . $match[7] . '\\' . $counter[$match[7]] . $match[8];
+
+                } else {
+
+                    if(!isset($counter[$match[3]])) {
+                        $counter[$match[3]] = 0;
+                    }
+
+                    $tagName = $match[2] . $match[3] . '\\' . $counter[$match[3]] . $match[4] . $match[5];
+
+                    $counter[$match[3]]++;
+                }
+
+                return $tagName;
+            }, $this->currentHtml);
     }
 }
