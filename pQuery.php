@@ -45,7 +45,7 @@ class pQuery
 
         $selector = trim($selector);
 
-        if(preg_match("#^([a-z0-9]+)(?:\[([a-z0-9\-]+)(?:(\^|!|\$|\*)?=(.+?))?\])?(?::([a-z]+)(?:\((.*?)\))?)?(?:\s(.+?))?$#si", $selector, $match)) {
+        if(preg_match("#^([a-z0-9]+)(?:\[([a-z0-9\-]+)(?:(\^|!|\$|\*)?=(.+?))?\]|((\#|\.)([a-z0-9\-]+)))?(?::([a-z]+)(?:\((.*?)\))?)?(?:\s(.+?))?$#si", $selector, $match)) {
 
             $tagName = $match[1];
             $attribute = false;
@@ -55,29 +55,41 @@ class pQuery
             $extensionValue = false;
             $subSelector = false;
 
-            if(isset($match[2])) {
+            if(isset($match[2]) && $match[2]) {
                 $attribute = $match[2];
             }
 
-            if(isset($match[3])) {
+            if(isset($match[3]) && $match[3]) {
                 $operator = $match[3];
+            } elseif(isset($match[6]) && $match[6]) {
+                $operator = $match[6];
+                switch($operator) {
+                    case '.':
+                        $attribute = 'class';
+                        break;
+                    case '#':
+                        $attribute = 'id';
+                        break;
+                }
             }
 
-            if(isset($match[4])) {
+            if(isset($match[4]) && $match[4]) {
                 $value = $match[4];
                 $value = str_replace('"', '\\"', $value);
+            } elseif(isset($match[7]) && $match[7]) {
+                $value = $match[7];
             }
 
-            if(isset($match[5])) {
-                $extensionName = $match[5];
+            if(isset($match[8]) && $match[8]) {
+                $extensionName = $match[8];
             }
 
-            if(isset($match[6])) {
-                $extensionValue = $match[6];
+            if(isset($match[9]) && $match[9]) {
+                $extensionValue = $match[9];
             }
 
-            if(isset($match[7])) {
-                $subSelector = $match[7];
+            if(isset($match[10]) && $match[10]) {
+                $subSelector = $match[10];
             }
 
             $regex = '<' . $tagName . '(\\\\[0-9]+)';
@@ -89,6 +101,9 @@ class pQuery
                 if($value) {
 
                     switch($operator) {
+                        case '.':
+                            $value = '(?:|.*\s)' . $value . '(?:|\s.*)';
+                            break;
                         case '^':
                             $value = $value . '.+?';
                             break;
