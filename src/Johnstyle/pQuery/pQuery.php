@@ -1,16 +1,31 @@
 <?php
 
+namespace Johnstyle\pQuery;
+
+/**
+ * Class pQuery
+ *
+ * @author  Jonathan SAHM <contact@johnstyle.fr>
+ * @package Johnstyle\pQuery
+ */
 class pQuery
 {
     private $html;
     private $currentHtml;
 
+    /**
+     * @param $html
+     */
     public function __construct ($html)
     {
         $this->html = $html;
         $this->currentHtml = $html;
     }
 
+    /**
+     * @param  bool $attribute
+     * @return bool
+     */
     public function attr ($attribute = false)
     {
         if(preg_match("#^<[^>]+" . $attribute . "=(['\"])(.*?)\\1[^>]*>#si", $this->currentHtml, $match)) {
@@ -20,11 +35,17 @@ class pQuery
         return false;
     }
 
+    /**
+     * @return string
+     */
     public function text ()
     {
         return strip_tags($this->html());
     }
 
+    /**
+     * @return bool
+     */
     public function html ()
     {
         if(preg_match("#^<[^>]+>(.*)</[^>]+>$#si", $this->currentHtml, $match)) {
@@ -34,6 +55,11 @@ class pQuery
         return false;
     }
 
+    /**
+     * @param  string $selector
+     * @param  bool   $currentHtml
+     * @return $this
+     */
     public function find ($selector, $currentHtml = false)
     {
         if(!$currentHtml) {
@@ -177,6 +203,9 @@ class pQuery
         return false;
     }
 
+    /**
+     *
+     */
     private function setUnic()
     {
         $counter = array();
