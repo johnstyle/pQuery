@@ -62,7 +62,7 @@ class pQuery
      * @param  string $html
      * @return $this
      */
-    private function parse ($selector, $html = null)
+    private function parse ($selector, $html = null, $level = 0)
     {
         if(is_null($html)) {
 
@@ -72,9 +72,10 @@ class pQuery
 
         $selector = trim($selector);
 
-        if(preg_match("#^([a-z0-9]+)(?:\[([a-z0-9\-]+)(?:(\^|!|\$|\*)?=(.+?))?\]|((\#|\.)([a-z0-9\-]+)))?(?::([a-z]+)(?:\((.*?)\))?)?(?:\s(.+?))?$#si", $selector, $match)) {
+        if(preg_match("#^(>\s*)?([a-z0-9]+)(?:\[([a-z0-9\-]+)(?:(\^|!|\$|\*)?=(.+?))?\]|((\#|\.)([a-z0-9\-]+)))?(?::([a-z]+)(?:\((.*?)\))?)?(?:\s(.+?))?$#si", $selector, $match)) {
 
-            $tagName = $match[1];
+            $firstLevel = $match[1];
+            $tagName = $match[2];
             $attribute = false;
             $operator = false;
             $value = false;
@@ -82,18 +83,18 @@ class pQuery
             $extensionValue = false;
             $subSelector = false;
 
-            if(isset($match[2]) && $match[2]) {
-
-                $attribute = $match[2];
-            }
-
             if(isset($match[3]) && $match[3]) {
 
-                $operator = $match[3];
+                $attribute = $match[3];
+            }
 
-            } elseif(isset($match[6]) && $match[6]) {
+            if(isset($match[4]) && $match[4]) {
 
-                $operator = $match[6];
+                $operator = $match[4];
+
+            } elseif(isset($match[7]) && $match[7]) {
+
+                $operator = $match[7];
 
                 switch($operator) {
 
@@ -109,32 +110,32 @@ class pQuery
                 }
             }
 
-            if(isset($match[4]) && $match[4]) {
+            if(isset($match[5]) && $match[5]) {
 
-                $value = $match[4];
+                $value = $match[5];
                 $value = str_replace('"', '\\"', $value);
 
-            } elseif(isset($match[7]) && $match[7]) {
+            } elseif(isset($match[8]) && $match[8]) {
 
-                $value = $match[7];
-            }
-
-            if(isset($match[8]) && $match[8]) {
-
-                $extensionName = $match[8];
+                $value = $match[8];
             }
 
             if(isset($match[9]) && $match[9]) {
 
-                $extensionValue = $match[9];
+                $extensionName = $match[9];
             }
 
             if(isset($match[10]) && $match[10]) {
 
-                $subSelector = $match[10];
+                $extensionValue = $match[10];
             }
 
-            $regex = '<' . $tagName . '(\\\\[0-9]+)';
+            if(isset($match[11]) && $match[11]) {
+
+                $subSelector = trim($match[11]);
+            }
+
+            $regex = '<' . $tagName . '(\\\\(' . ($firstLevel ? $level : '[0-9]+') . ')\-([0-9]+))';
 
             if($attribute) {
 
@@ -176,7 +177,7 @@ class pQuery
                     $value = '.*?';
                 }
 
-                $regex .= '\s*=\s*([\'"])' . $value . '\2';
+                $regex .= '\s*=\s*([\'"])' . $value . '\4';
 
             } else {
 
@@ -219,7 +220,7 @@ class pQuery
 
                     if(false !== $subSelector) {
 
-                        $this->parse($subSelector, $matches[3][$i]);
+                        $this->parse($subSelector, $matches[5][$i], $matches[2][$i]+1);
                         break;
                     }
 
@@ -241,30 +242,45 @@ class pQuery
     private function initHtml()
     {
         $counter = array();
+        $level = 0;
 
         if($this->charsetInput !== $this->charsetOutput) {
 
             $this->html = mb_convert_encoding($this->html, $this->charsetOutput, $this->charsetInput);
         }
 
-        $this->html = preg_replace_callback("#((<)([a-z]+)(\s[^>]*|)(/?>)|(</)([a-z]+)(>))#si", function ($match) use(&$counter) {
+        $this->html = preg_replace_callback("#(?:<([a-z]+)(\s[^>]*?|)(/)?>|</([a-z]+)>)#si", function ($match) use(&$level, &$counter) {
 
-            if(isset($match[7])) {
+            if(isset($match[4])) {
 
-                $counter[$match[7]]--;
+                $tagname = $match[4];
 
-                $tagName = $match[6] . $match[7] . '\\' . $counter[$match[7]] . $match[8];
+                $counter[$tagname]--;
+
+                $level--;
+
+                $tagName = '</' . $tagname . '\\' . $level . '-' . $counter[$tagname] . '>';
 
             } else {
 
-                if(!isset($counter[$match[3]])) {
+                $tagname = $match[1];
+                $attributes = $match[2];
+                $slash = isset($match[3]) ? $match[3] : null;
 
-                    $counter[$match[3]] = 0;
+                if(!isset($counter[$tagname])) {
+
+                    $counter[$tagname] = 0;
                 }
 
-                $tagName = $match[2] . $match[3] . '\\' . $counter[$match[3]] . $match[4] . $match[5];
+                $tagName = '<' . $tagname . '\\' . $level . '-' . $counter[$tagname] . $attributes . $slash . '>';
 
-                $counter[$match[3]]++;
+                if(is_null($slash)
+                    && !in_array($tagname, array('img', 'link', 'meta', 'input', 'br', 'hr', 'area', 'base',
+                        'basefont', 'col', 'embed', 'param', 'frame', 'keygen', 'source', 'track'))) {
+
+                    $level++;
+                    $counter[$match[1]]++;
+                }
             }
 
             return $tagName;

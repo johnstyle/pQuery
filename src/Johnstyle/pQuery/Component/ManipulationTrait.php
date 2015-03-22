@@ -52,7 +52,7 @@ trait ManipulationTrait
     {
         $html = isset($this->matches[$this->index]) ? $this->matches[$this->index] : null;
 
-        return trim(preg_replace('#(</?[a-z]+)\\\\[0-9+](\s|/?>)#si', '$1$2', $html));
+        return trim(preg_replace('#(</?[a-z]+)\\\\[0-9]+\-[0-9]+(\s|/?>)#si', '$1$2', $html));
     }
 
     /**
