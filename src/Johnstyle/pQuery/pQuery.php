@@ -2,6 +2,9 @@
 
 namespace Johnstyle\pQuery;
 
+use Johnstyle\pQuery\Component\ManipulationTrait;
+use Johnstyle\pQuery\Component\TraversingTrait;
+
 /**
  * Class pQuery
  *
@@ -10,67 +13,48 @@ namespace Johnstyle\pQuery;
  */
 class pQuery
 {
+    use TraversingTrait;
+    use ManipulationTrait;
+
+    const DEFAULT_INPUT_CHARSET = 'UTF-8';
+    const DEFAULT_OUTPUT_CHARSET = 'UTF-8';
+
+    /** @var string $charsetInput */
+    private $charsetInput = self::DEFAULT_INPUT_CHARSET;
+
+    /** @var string $charsetOutput */
+    private $charsetOutput = self::DEFAULT_OUTPUT_CHARSET;
+
     /** @var string $html */
     private $html;
 
     /** @var array $matches */
-    private $matches = array();
+    public $matches = array();
 
     /** @var int $index */
     private $index = 0;
 
     /**
      * @param string $html
+     * @param string $charsetInput
+     * @param string $charsetOutput
      */
-    public function __construct ($html)
+    public function __construct ($html, $charsetInput = self::DEFAULT_OUTPUT_CHARSET, $charsetOutput = self::DEFAULT_OUTPUT_CHARSET)
     {
-        $this->setHtml($html);
+        $this->html = $html;
+        $this->charsetInput = $charsetInput;
+        $this->charsetOutput = $charsetOutput;
+
+        $this->initHtml();
     }
 
     /**
-     * @param  string $attribute
-     * @return string
+     * @param  string $selector
+     * @return static
      */
-    public function attr ($attribute)
+    public function find ($selector)
     {
-        if(preg_match("#^<[^>]+" . $attribute . "=(['\"])(.*?)\\1[^>]*>#si", $this->prepareHtml(), $match)) {
-
-            return trim($match[2]);
-        }
-
-        return null;
-    }
-
-    /**
-     * @return string
-     */
-    public function text ()
-    {
-        return trim(strip_tags($this->html()));
-    }
-
-    /**
-     * @return string
-     */
-    public function html ()
-    {
-        if(preg_match("#^<[^>]+>(.*)</[^>]+>$#si", $this->prepareHtml(), $match)) {
-
-            return trim($match[1]);
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  int $index
-     * @return $this
-     */
-    public function eq ($index)
-    {
-        $this->index = (int) $index;
-
-        return $this;
+        return (new static($this->html))->parse($selector);
     }
 
     /**
@@ -78,7 +62,7 @@ class pQuery
      * @param  string $html
      * @return $this
      */
-    public function find ($selector, $html = null)
+    private function parse ($selector, $html = null)
     {
         if(is_null($html)) {
 
@@ -235,7 +219,7 @@ class pQuery
 
                     if(false !== $subSelector) {
 
-                        $this->find($subSelector, $matches[3][$i]);
+                        $this->parse($subSelector, $matches[3][$i]);
                         break;
                     }
 
@@ -252,30 +236,16 @@ class pQuery
     }
 
     /**
-     * @param  callable $callback
      * @return $this
      */
-    public function each(callable $callback)
-    {
-        $matches = $this->matches;
-
-        foreach($matches as $match) {
-
-            $this->html = $match;
-
-            call_user_func_array($callback, array(&$this));
-        }
-
-        return $this;
-    }
-
-    /**
-     * @param  string $html
-     * @return $this
-     */
-    private function setHtml($html)
+    private function initHtml()
     {
         $counter = array();
+
+        if($this->charsetInput !== $this->charsetOutput) {
+
+            $this->html = mb_convert_encoding($this->html, $this->charsetOutput, $this->charsetInput);
+        }
 
         $this->html = preg_replace_callback("#((<)([a-z]+)(\s[^>]*|)(/?>)|(</)([a-z]+)(>))#si", function ($match) use(&$counter) {
 
@@ -299,18 +269,8 @@ class pQuery
 
             return $tagName;
 
-        }, $html);
+        }, $this->html);
 
         return $this;
-    }
-
-    /**
-     * @return string
-     */
-    private function prepareHtml()
-    {
-        $html = isset($this->matches[$this->index]) ? $this->matches[$this->index] : null;
-
-        return trim(preg_replace('#(</?[a-z]+)\\\\[0-9+](\s|/?>)#si', '$1$2', $html));
     }
 }
